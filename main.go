@@ -12,6 +12,9 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	"github.com/tinne26/etxt"
+	"golang.org/x/image/font/gofont/goregular"
+	"golang.org/x/image/font/opentype"
 )
 
 //go:embed assets/title.png
@@ -55,7 +58,15 @@ func isMouseOverButton(x, y, width, height float64) bool {
 
 func titleScene(screen *ebiten.Image, g *Game) {
 	screen.Fill(color.RGBA{242, 240, 239, 255})
-
+	if g.winner != 0 {
+		if g.winner == 1 {
+			g.text.Draw(screen, "X wins!", 380, 380)
+		} else if g.winner == 2 {
+			g.text.Draw(screen, "O wins!", 380, 380)
+		} else if g.winner == 3 {
+			g.text.Draw(screen, "It's a draw!", 380, 380)
+		}
+	}
 	if titleImage != nil {
 		op := &ebiten.DrawImageOptions{}
 		op.GeoM.Translate(
@@ -133,12 +144,15 @@ type Game struct {
 	turn   uint8
 	player uint8
 	board  [3][3]uint8
+	winner uint8
+	text   *etxt.Renderer
 }
 
 func (g *Game) init() error {
 	g.turn = 0
 	g.player = 0
 	g.board = [3][3]uint8{}
+	g.winner = 0
 	var err error
 	g.state = 0
 	titleImage, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(titlePNG))
@@ -158,9 +172,29 @@ func (g *Game) init() error {
 	pw, ph := playTextImage.Bounds().Dx(), playTextImage.Bounds().Dy()
 	playTextX, playTextY = buttonX+float64((buttonWidth-pw)/2), buttonY+float64((buttonHeight-ph)/2)
 
+	g.text, err = loadTextRenderer()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
+
+func loadTextRenderer() (*etxt.Renderer, error) {
+	font, err := opentype.Parse(goregular.TTF)
+	if err != nil {
+		return nil, err
+	}
+
+	renderer := etxt.NewRenderer()
+	renderer.SetFont(font)
+	renderer.SetSize(24)
+	renderer.SetColor(color.Black)
+
+	return renderer, nil
+}
 func titleUpdate(g *Game) {
+
 	offset := math.Sin(float64(ebiten.Tick()) * 0.05)
 	titleY = baseTitleY + offset*8
 
@@ -169,29 +203,42 @@ func titleUpdate(g *Game) {
 			g.state = 1
 			g.turn = 0
 			g.player = 0
+			g.winner = 0
 			g.board = [3][3]uint8{}
 			ebiten.SetCursorShape(ebiten.CursorShapeDefault)
 		}
 	}
 }
-func checkWin(board [3][3]uint8, player uint8, g *Game) bool {
+func checkWin(board [3][3]uint8, g *Game) int {
 
 	for i := 0; i < 3; i++ {
-		if board[i][0] == player && board[i][1] == player && board[i][2] == player {
-			return true
+		if board[i][0] == 1 && board[i][1] == 1 && board[i][2] == 1 {
+			return 1
+		}
+		if board[i][0] == 2 && board[i][1] == 2 && board[i][2] == 2 {
+			return 2
 		}
 	}
 
 	for j := 0; j < 3; j++ {
-		if board[0][j] == player && board[1][j] == player && board[2][j] == player {
-			return true
+		if board[0][j] == 1 && board[1][j] == 1 && board[2][j] == 1 {
+			return 1
+		}
+		if board[0][j] == 2 && board[1][j] == 2 && board[2][j] == 2 {
+			return 2
 		}
 	}
-	if board[0][0] == player && board[1][1] == player && board[2][2] == player {
-		return true
+	if board[0][0] == 1 && board[1][1] == 1 && board[2][2] == 1 {
+		return 1
 	}
-	if board[0][2] == player && board[1][1] == player && board[2][0] == player {
-		return true
+	if board[0][0] == 2 && board[1][1] == 2 && board[2][2] == 2 {
+		return 2
+	}
+	if board[0][2] == 1 && board[1][1] == 1 && board[2][0] == 1 {
+		return 1
+	}
+	if board[0][2] == 2 && board[1][1] == 2 && board[2][0] == 2 {
+		return 2
 	}
 	full := true
 	for i := 0; i < 3; i++ {
@@ -203,9 +250,9 @@ func checkWin(board [3][3]uint8, player uint8, g *Game) bool {
 	}
 	if full {
 		log.Println("It's a draw!")
-		g.state = 0
+		return 0
 	}
-	return false
+	return -1
 }
 
 func gameUpdate(g *Game) {
@@ -216,24 +263,34 @@ func gameUpdate(g *Game) {
 				if g.turn == g.player && g.board[i%3][i/3] == 0 {
 					g.board[i%3][i/3] = g.player + 1
 
-					if checkWin(g.board, g.player+1, g) {
-						if g.player == 0 {
-							log.Println("X wins!")
-						} else {
-							log.Println("O wins!")
-						}
+					switch checkWin(g.board, g) {
+					case 1:
+						log.Println("X wins!")
 						g.state = 0
+						g.winner = 1
+						return
+					case 2:
+						log.Println("O wins!")
+						g.state = 0
+						g.winner = 2
+						return
+					case 0:
+						log.Println("It's a draw!")
+						g.state = 0
+						g.winner = 3
 						return
 					}
 
-					g.turn = (g.turn + 1) % 2
-					g.player = (g.player + 1) % 2
-					break
 				}
+
+				g.turn = (g.turn + 1) % 2
+				g.player = (g.player + 1) % 2
+				break
 			}
 		}
 	}
 }
+
 func (g *Game) Update() error {
 	switch g.state {
 	case 0:
