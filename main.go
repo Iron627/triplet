@@ -19,6 +19,14 @@ var titlePNG []byte
 var titleImage *ebiten.Image
 var titleX, titleY, baseTitleY float64
 
+//go:embed assets/x.png
+var xPng []byte
+var xImage *ebiten.Image
+
+//go:embed assets/o.png
+var oPng []byte
+var oImage *ebiten.Image
+
 //go:embed assets/playText.png
 var playTextPNG []byte
 var playTextImage *ebiten.Image
@@ -37,10 +45,12 @@ var (
 	darkGrey = color.RGBA{160, 140, 80, 255}
 )
 
-func isMouseOverButton() bool {
+var gridBoxes [9][4]float64
+
+func isMouseOverButton(x, y, width, height float64) bool {
 	mx, my := ebiten.CursorPosition()
-	return float64(mx) >= buttonX && float64(mx) <= buttonX+float64(buttonWidth) &&
-		float64(my) >= buttonY && float64(my) <= buttonY+float64(buttonHeight)
+	return float64(mx) >= x && float64(mx) <= x+width &&
+		float64(my) >= y && float64(my) <= y+height
 }
 
 func titleScene(screen *ebiten.Image, g *Game) {
@@ -55,10 +65,10 @@ func titleScene(screen *ebiten.Image, g *Game) {
 	}
 
 	buttonColor := grey
-	if isMouseOverButton() {
+	if isMouseOverButton(buttonX, buttonY, float64(buttonWidth), float64(buttonHeight)) {
 		buttonColor = darkGrey
 	}
-	if isMouseOverButton() {
+	if isMouseOverButton(buttonX, buttonY, float64(buttonWidth), float64(buttonHeight)) {
 		ebiten.SetCursorShape(ebiten.CursorShapePointer)
 	} else {
 		ebiten.SetCursorShape(ebiten.CursorShapeDefault)
@@ -74,15 +84,66 @@ func titleScene(screen *ebiten.Image, g *Game) {
 		screen.DrawImage(playTextImage, op)
 	}
 }
+func gameScene(screen *ebiten.Image, g *Game) {
+	screen.Fill(color.RGBA{242, 240, 239, 255})
+	gridSize := 300.0
+	cellSize := gridSize / 3
+	xStart := (float64(screenWidth) - gridSize) / 2
+	yStart := (float64(screenHeight) - gridSize) / 2
+	lineColor := color.RGBA{0, 0, 0, 255}
+	for i := 0; i <= 3; i++ {
+		x := xStart + float64(i)*cellSize
+		vector.StrokeLine(screen, float32(x), float32(yStart), float32(x), float32(yStart+gridSize), 2, lineColor, false)
+	}
+	for j := 0; j <= 3; j++ {
+		y := yStart + float64(j)*cellSize
+		vector.StrokeLine(screen, float32(xStart), float32(y), float32(xStart+gridSize), float32(y), 2, lineColor, false)
+	}
+	k := 0
+	for i := 0; i < 3; i++ {
+		for j := 0; j < 3; j++ {
+			gridBoxes[k] = [4]float64{xStart + float64(i)*cellSize, yStart + float64(j)*cellSize, cellSize, cellSize}
+			k++
+		}
+	}
+	for i := 0; i < 9; i++ {
+		x, y, w, h := gridBoxes[i][0], gridBoxes[i][1], gridBoxes[i][2], gridBoxes[i][3]
+		if g.board[i%3][i/3] == 1 {
+			op := &ebiten.DrawImageOptions{}
+			op.GeoM.Scale(0.2, 0.2)
+			op.GeoM.Translate(x+cellSize*0.1, y+cellSize*0.1)
+			screen.DrawImage(xImage, op)
+		}
+		if g.board[i%3][i/3] == 2 {
+			op := &ebiten.DrawImageOptions{}
+			op.GeoM.Scale(0.2, 0.2)
+			op.GeoM.Translate(x+cellSize*0.1, y+cellSize*0.1)
+			screen.DrawImage(oImage, op)
+		}
+		if isMouseOverButton(x, y, w, h) {
+			vector.FillRect(screen, float32(x), float32(y), float32(w), float32(h), color.RGBA{70, 70, 255, 102}, true)
+
+		}
+
+	}
+}
 
 type Game struct {
-	state uint8
+	state  uint8
+	turn   uint8
+	player uint8
+	board  [3][3]uint8
 }
 
 func (g *Game) init() error {
+	g.turn = 0
+	g.player = 0
+
 	var err error
 	g.state = 0
 	titleImage, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(titlePNG))
+	xImage, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(xPng))
+	oImage, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(oPng))
 	w, h := titleImage.Bounds().Dx(), titleImage.Bounds().Dy()
 	titleX, baseTitleY = (854-float64(w))/2, (480-float64(h)-200)/2
 	titleY = baseTitleY
@@ -99,18 +160,39 @@ func (g *Game) init() error {
 
 	return nil
 }
-
-func (g *Game) Update() error {
+func titleUpdate(g *Game) {
 	offset := math.Sin(float64(ebiten.Tick()) * 0.05)
 	titleY = baseTitleY + offset*8
 
-	if g.state == 0 && inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		if isMouseOverButton() {
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		if isMouseOverButton(buttonX, buttonY, float64(buttonWidth), float64(buttonHeight)) {
 			g.state = 1
 			ebiten.SetCursorShape(ebiten.CursorShapeDefault)
 		}
 	}
-
+}
+func gameUpdate(g *Game) {
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		for i := 0; i < 9; i++ {
+			x, y, w, h := gridBoxes[i][0], gridBoxes[i][1], gridBoxes[i][2], gridBoxes[i][3]
+			if isMouseOverButton(x, y, w, h) {
+				if g.turn == g.player && g.board[i%3][i/3] == 0 {
+					g.board[i%3][i/3] = g.player + 1
+					g.turn = (g.turn + 1) % 2
+					g.player = (g.player + 1) % 2
+					break
+				}
+			}
+		}
+	}
+}
+func (g *Game) Update() error {
+	switch g.state {
+	case 0:
+		titleUpdate(g)
+	case 1:
+		gameUpdate(g)
+	}
 	return nil
 }
 
@@ -118,6 +200,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	switch g.state {
 	case 0:
 		titleScene(screen, g)
+
+	case 1:
+		gameScene(screen, g)
 	}
 }
 
