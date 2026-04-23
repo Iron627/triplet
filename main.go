@@ -138,7 +138,7 @@ type Game struct {
 func (g *Game) init() error {
 	g.turn = 0
 	g.player = 0
-
+	g.board = [3][3]uint8{}
 	var err error
 	g.state = 0
 	titleImage, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(titlePNG))
@@ -167,10 +167,47 @@ func titleUpdate(g *Game) {
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		if isMouseOverButton(buttonX, buttonY, float64(buttonWidth), float64(buttonHeight)) {
 			g.state = 1
+			g.turn = 0
+			g.player = 0
+			g.board = [3][3]uint8{}
 			ebiten.SetCursorShape(ebiten.CursorShapeDefault)
 		}
 	}
 }
+func checkWin(board [3][3]uint8, player uint8, g *Game) bool {
+
+	for i := 0; i < 3; i++ {
+		if board[i][0] == player && board[i][1] == player && board[i][2] == player {
+			return true
+		}
+	}
+
+	for j := 0; j < 3; j++ {
+		if board[0][j] == player && board[1][j] == player && board[2][j] == player {
+			return true
+		}
+	}
+	if board[0][0] == player && board[1][1] == player && board[2][2] == player {
+		return true
+	}
+	if board[0][2] == player && board[1][1] == player && board[2][0] == player {
+		return true
+	}
+	full := true
+	for i := 0; i < 3; i++ {
+		for j := 0; j < 3; j++ {
+			if board[i][j] == 0 {
+				full = false
+			}
+		}
+	}
+	if full {
+		log.Println("It's a draw!")
+		g.state = 0
+	}
+	return false
+}
+
 func gameUpdate(g *Game) {
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		for i := 0; i < 9; i++ {
@@ -178,6 +215,17 @@ func gameUpdate(g *Game) {
 			if isMouseOverButton(x, y, w, h) {
 				if g.turn == g.player && g.board[i%3][i/3] == 0 {
 					g.board[i%3][i/3] = g.player + 1
+
+					if checkWin(g.board, g.player+1, g) {
+						if g.player == 0 {
+							log.Println("X wins!")
+						} else {
+							log.Println("O wins!")
+						}
+						g.state = 0
+						return
+					}
+
 					g.turn = (g.turn + 1) % 2
 					g.player = (g.player + 1) % 2
 					break
