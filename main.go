@@ -51,11 +51,10 @@ var (
 var gridBoxes [9][4]float64
 
 var (
-	switchWidth  = 160.0
-	switchHeight = 36.0
-	switchX      = float64(screenWidth)/2 - switchWidth/2
-	switchY      = 370.0
-
+	switchWidth    = 160.0
+	switchHeight   = 36.0
+	switchX        = float64(screenWidth)/2 - switchWidth/2
+	switchY        = 370.0
 	switchTrackOff = color.RGBA{180, 160, 100, 255}
 	switchTrackOn  = color.RGBA{100, 160, 100, 255}
 	switchThumbCol = color.RGBA{255, 255, 255, 230}
@@ -72,7 +71,6 @@ func drawSwitch(screen *ebiten.Image, aiMode bool) {
 	if aiMode {
 		trackColor = switchTrackOn
 	}
-
 	vector.FillRect(screen,
 		float32(switchX+switchHeight/2), float32(switchY),
 		float32(switchWidth-switchHeight), float32(switchHeight),
@@ -83,7 +81,6 @@ func drawSwitch(screen *ebiten.Image, aiMode bool) {
 	vector.FillCircle(screen,
 		float32(switchX+switchWidth-switchHeight/2), float32(switchY+switchHeight/2),
 		float32(switchHeight/2), trackColor, true)
-
 	thumbCX := switchX + switchHeight/2
 	if aiMode {
 		thumbCX = switchX + switchWidth - switchHeight/2
@@ -95,40 +92,34 @@ func drawSwitch(screen *ebiten.Image, aiMode bool) {
 
 func titleScene(screen *ebiten.Image, g *Game) {
 	screen.Fill(color.RGBA{242, 240, 239, 255})
-
 	if g.winner != 0 {
 		if g.winner == 1 {
-			g.text.Draw(screen, "X wins!", 380, 380)
+			g.text.Draw(screen, "X wins!", 380, 280)
 		} else if g.winner == 2 {
-			g.text.Draw(screen, "O wins!", 380, 380)
+			g.text.Draw(screen, "O wins!", 380, 280)
 		} else if g.winner == 3 {
-			g.text.Draw(screen, "It's a draw!", 380, 380)
+			g.text.Draw(screen, "It's a draw!", 380, 280)
 		}
 	}
-
 	if titleImage != nil {
 		op := &ebiten.DrawImageOptions{}
 		op.GeoM.Translate(titleX, titleY)
 		screen.DrawImage(titleImage, op)
 	}
-
 	buttonColor := grey
 	if isMouseOverButton(buttonX, buttonY, float64(buttonWidth), float64(buttonHeight)) {
 		buttonColor = darkGrey
 	}
-
 	if isMouseOverButton(buttonX, buttonY, float64(buttonWidth), float64(buttonHeight)) ||
 		isMouseOverButton(switchX, switchY, switchWidth, switchHeight) {
 		ebiten.SetCursorShape(ebiten.CursorShapePointer)
 	} else {
 		ebiten.SetCursorShape(ebiten.CursorShapeDefault)
 	}
-
 	vector.FillRect(screen,
 		float32(buttonX), float32(buttonY),
 		float32(buttonWidth), float32(buttonHeight),
 		buttonColor, true)
-
 	if playTextImage != nil {
 		op := &ebiten.DrawImageOptions{}
 		op.GeoM.Scale(0.6, 0.6)
@@ -136,16 +127,8 @@ func titleScene(screen *ebiten.Image, g *Game) {
 		screen.DrawImage(playTextImage, op)
 	}
 	drawSwitch(screen, g.aiMode)
-
-	labelOff := "2P"
-	labelOn := "vs AI"
-	if g.aiMode {
-		g.text.Draw(screen, labelOff, int(switchX-10)-30, int(switchY+switchHeight/2)+8)
-		g.text.Draw(screen, labelOn, int(switchX+switchWidth+10), int(switchY+switchHeight/2)+8)
-	} else {
-		g.text.Draw(screen, labelOff, int(switchX-10)-30, int(switchY+switchHeight/2)+8)
-		g.text.Draw(screen, labelOn, int(switchX+switchWidth+10), int(switchY+switchHeight/2)+8)
-	}
+	g.text.Draw(screen, "2P", int(switchX-10)-30, int(switchY+switchHeight/2)+8)
+	g.text.Draw(screen, "vs AI", int(switchX+switchWidth+10), int(switchY+switchHeight/2)+8)
 }
 
 func drawGrid(screen *ebiten.Image, g *Game) {
@@ -154,7 +137,6 @@ func drawGrid(screen *ebiten.Image, g *Game) {
 	xStart := (float64(screenWidth) - gridSize) / 2
 	yStart := (float64(screenHeight) - gridSize) / 2
 	lineColor := color.RGBA{0, 0, 0, 255}
-
 	for i := 0; i <= 3; i++ {
 		x := xStart + float64(i)*cellSize
 		vector.StrokeLine(screen, float32(x), float32(yStart), float32(x), float32(yStart+gridSize), 2, lineColor, false)
@@ -163,7 +145,6 @@ func drawGrid(screen *ebiten.Image, g *Game) {
 		y := yStart + float64(j)*cellSize
 		vector.StrokeLine(screen, float32(xStart), float32(y), float32(xStart+gridSize), float32(y), 2, lineColor, false)
 	}
-
 	k := 0
 	for i := 0; i < 3; i++ {
 		for j := 0; j < 3; j++ {
@@ -171,7 +152,6 @@ func drawGrid(screen *ebiten.Image, g *Game) {
 			k++
 		}
 	}
-
 	for i := 0; i < 9; i++ {
 		x, y, w, h := gridBoxes[i][0], gridBoxes[i][1], gridBoxes[i][2], gridBoxes[i][3]
 		if g.board[i%3][i/3] == 1 {
@@ -203,13 +183,14 @@ func gameAIScene(screen *ebiten.Image, g *Game) {
 }
 
 type Game struct {
-	state  uint8
-	turn   uint8
-	player uint8
-	board  [3][3]uint8
-	winner uint8
-	text   *etxt.Renderer
-	aiMode bool
+	state        uint8
+	turn         uint8
+	player       uint8
+	board        [3][3]uint8
+	winner       uint8
+	text         *etxt.Renderer
+	aiMode       bool
+	endGameTimer uint8
 }
 
 func (g *Game) init() error {
@@ -218,29 +199,23 @@ func (g *Game) init() error {
 	g.board = [3][3]uint8{}
 	g.winner = 0
 	g.aiMode = false
-	var err error
 	g.state = 0
-
+	var err error
 	titleImage, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(titlePNG))
 	xImage, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(xPng))
 	oImage, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(oPng))
-
 	w, h := titleImage.Bounds().Dx(), titleImage.Bounds().Dy()
 	titleX, baseTitleY = (854-float64(w))/2, (480-float64(h)-200)/2
 	titleY = baseTitleY
-
 	if err != nil {
 		return err
 	}
-
 	playTextImage, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(playTextPNG))
 	if err != nil {
 		return err
 	}
-
 	pw, ph := playTextImage.Bounds().Dx(), playTextImage.Bounds().Dy()
 	playTextX, playTextY = buttonX+float64((buttonWidth-pw)/2), buttonY+float64((buttonHeight-ph)/2)
-
 	g.text, err = loadTextRenderer()
 	if err != nil {
 		return err
@@ -263,20 +238,17 @@ func loadTextRenderer() (*etxt.Renderer, error) {
 func titleUpdate(g *Game) {
 	offset := math.Sin(float64(ebiten.Tick()) * 0.05)
 	titleY = baseTitleY + offset*8
-
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		if isMouseOverButton(switchX, switchY, switchWidth, switchHeight) {
 			g.aiMode = !g.aiMode
 			return
 		}
-
 		if isMouseOverButton(buttonX, buttonY, float64(buttonWidth), float64(buttonHeight)) {
 			g.turn = 0
 			g.player = 0
 			g.winner = 0
 			g.board = [3][3]uint8{}
 			ebiten.SetCursorShape(ebiten.CursorShapeDefault)
-
 			if g.aiMode {
 				g.state = 2
 			} else {
@@ -287,7 +259,7 @@ func titleUpdate(g *Game) {
 	}
 }
 
-func checkWin(board [3][3]uint8, g *Game) int {
+func checkWin(board [3][3]uint8) int {
 	for i := 0; i < 3; i++ {
 		if board[i][0] == 1 && board[i][1] == 1 && board[i][2] == 1 {
 			return 1
@@ -325,7 +297,6 @@ func checkWin(board [3][3]uint8, g *Game) int {
 		}
 	}
 	if full {
-		log.Println("It's a draw!")
 		return 0
 	}
 	return -1
@@ -338,21 +309,24 @@ func gameUpdate(g *Game) {
 			if isMouseOverButton(x, y, w, h) {
 				if g.turn == g.player && g.board[i%3][i/3] == 0 {
 					g.board[i%3][i/3] = g.player + 1
-					switch checkWin(g.board, g) {
+					switch checkWin(g.board) {
 					case 1:
 						log.Println("X wins!")
-						g.state = 0
+						g.state = 3
 						g.winner = 1
+						g.endGameTimer = 0
 						return
 					case 2:
 						log.Println("O wins!")
-						g.state = 0
+						g.state = 3
 						g.winner = 2
+						g.endGameTimer = 0
 						return
 					case 0:
 						log.Println("It's a draw!")
-						g.state = 0
+						g.state = 3
 						g.winner = 3
+						g.endGameTimer = 0
 						return
 					}
 				}
@@ -365,6 +339,34 @@ func gameUpdate(g *Game) {
 }
 
 func gameAIUpdate(g *Game) {
+	if g.turn != g.player {
+		aiMove := getBestMove(g.board)
+		if aiMove != -1 {
+			g.board[aiMove/3][aiMove%3] = 2
+		}
+		g.turn = g.player
+		switch checkWin(g.board) {
+		case 1:
+			log.Println("X wins!")
+			g.state = 3
+			g.winner = 1
+			g.endGameTimer = 0
+			return
+		case 2:
+			log.Println("O wins!")
+			g.state = 3
+			g.winner = 2
+			g.endGameTimer = 0
+			return
+		case 0:
+			log.Println("It's a draw!")
+			g.state = 3
+			g.winner = 3
+			g.endGameTimer = 0
+			return
+		}
+		return
+	}
 	overCell := false
 	for i := 0; i < 9; i++ {
 		x, y, w, h := gridBoxes[i][0], gridBoxes[i][1], gridBoxes[i][2], gridBoxes[i][3]
@@ -378,6 +380,104 @@ func gameAIUpdate(g *Game) {
 	} else {
 		ebiten.SetCursorShape(ebiten.CursorShapeDefault)
 	}
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		for i := 0; i < 9; i++ {
+			x, y, w, h := gridBoxes[i][0], gridBoxes[i][1], gridBoxes[i][2], gridBoxes[i][3]
+			if isMouseOverButton(x, y, w, h) && g.board[i%3][i/3] == 0 {
+				g.board[i%3][i/3] = 1
+				g.turn = 1
+				switch checkWin(g.board) {
+				case 1:
+					log.Println("X wins!")
+					g.state = 3
+					g.winner = 1
+					g.endGameTimer = 0
+					return
+				case 2:
+					log.Println("O wins!")
+					g.state = 3
+					g.winner = 2
+					g.endGameTimer = 0
+					return
+				case 0:
+					log.Println("It's a draw!")
+					g.state = 3
+					g.winner = 3
+					g.endGameTimer = 0
+					return
+				}
+				break
+			}
+		}
+	}
+}
+
+func minimax(board [3][3]uint8, isMaximizing bool) int {
+	result := checkWin(board)
+	if result == 2 {
+		return 10
+	} else if result == 1 {
+		return -10
+	} else if result == 0 {
+		return 0
+	}
+	if isMaximizing {
+		bestScore := -1000
+		for i := 0; i < 9; i++ {
+			row := i / 3
+			col := i % 3
+			if board[row][col] == 0 {
+				board[row][col] = 2
+				score := minimax(board, false)
+				board[row][col] = 0
+				if score > bestScore {
+					bestScore = score
+				}
+			}
+		}
+		return bestScore
+	} else {
+		bestScore := 1000
+		for i := 0; i < 9; i++ {
+			row := i / 3
+			col := i % 3
+			if board[row][col] == 0 {
+				board[row][col] = 1
+				score := minimax(board, true)
+				board[row][col] = 0
+				if score < bestScore {
+					bestScore = score
+				}
+			}
+		}
+		return bestScore
+	}
+}
+
+func getBestMove(board [3][3]uint8) int {
+	bestScore := -1000
+	bestMove := -1
+	for i := 0; i < 9; i++ {
+		row := i / 3
+		col := i % 3
+		if board[row][col] == 0 {
+			board[row][col] = 2
+			score := minimax(board, false)
+			board[row][col] = 0
+			if score > bestScore {
+				bestScore = score
+				bestMove = i
+			}
+		}
+	}
+	return bestMove
+}
+
+func endGameUpdate(g *Game) {
+	g.endGameTimer++
+	if g.endGameTimer >= 120 {
+		g.state = 0
+	}
 }
 
 func (g *Game) Update() error {
@@ -388,6 +488,8 @@ func (g *Game) Update() error {
 		gameUpdate(g)
 	case 2:
 		gameAIUpdate(g)
+	case 3:
+		endGameUpdate(g)
 	}
 	return nil
 }
@@ -400,6 +502,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		gameScene(screen, g)
 	case 2:
 		gameAIScene(screen, g)
+	case 3:
+		gameScene(screen, g)
 	}
 }
 
